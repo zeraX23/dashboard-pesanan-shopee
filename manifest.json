@@ -2,7 +2,7 @@
   "name": "Dashboard Pesanan Shopee",
   "short_name": "Pesanan Shopee",
   "description": "Aplikasi Ringkas Dashboard Pesanan Shopee",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f4f6f9",
   "theme_color": "#ee4d2d",
