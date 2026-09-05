@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Pesanan Shopee Ringkas</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ee4d2d">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+
     <!-- Library SheetJS untuk membaca file Excel Shopee -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -88,7 +94,6 @@
     let ordersData = [];
     let currentTab = 'Semua';
 
-    // Sample data to start with if no file is uploaded yet
     const sampleData = [
       {
         "No. Pesanan": "260806KB2XEJS5",
@@ -120,7 +125,6 @@
         if (!val) return 0;
         let num = parseFloat(val);
         if (isNaN(num)) return 0;
-        // Adjust based on typical Shopee export format where decimals might be thousands if < 1000
         if (num > 0 && num < 1000) return num * 1000; 
         return num;
     }
@@ -155,10 +159,7 @@
 
         container.innerHTML = list.map(item => {
             let statusClass = getBadgeClass(item['Status Pesanan']);
-            // Try Subtotal if Total Pembayaran is empty/0
             let harga = parsePrice(item['Total Pembayaran']) || parsePrice(item['Subtotal Pesanan']);
-            
-            // Handle missing fields safely
             let noPesanan = item['No. Pesanan'] || '-';
             let pembeli = item['Username (Pembeli)'] || '-';
             let statusPesanan = item['Status Pesanan'] || 'Status Tidak Diketahui';
@@ -227,8 +228,6 @@
                 const data = new Uint8Array(evt.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.SheetNames[0];
-                
-                // Convert sheet to JSON
                 const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
                 
                 if(rawData.length > 0) {
@@ -246,12 +245,20 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // Initialize with sample data so the dashboard isn't completely empty initially
     window.onload = function() {
         ordersData = sampleData;
         updateStats();
         filterOrders();
     };
+
+    // --- SCRIPT REGISTRASI SERVICE WORKER UNTUK PWA ---
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('Service Worker berhasil didaftarkan!'))
+                .catch(err => console.log('Service Worker gagal didaftarkan: ', err));
+        });
+    }
 </script>
 
 </body>
