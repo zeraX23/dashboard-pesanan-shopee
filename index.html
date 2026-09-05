@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Pesanan Shopee Ringkas</title>
+    <!-- Library SheetJS untuk membaca file Excel Shopee -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { background-color: #f4f6f9; color: #333; padding: 15px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+        .title { color: #ee4d2d; font-size: 20px; font-weight: bold; }
+        
+        .upload-btn { background: #ee4d2d; color: white; padding: 9px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; border: none; display: inline-flex; align-items: center; gap: 6px; }
+        .upload-btn:hover { background: #d73d1f; }
+        
+        .search-container { margin-bottom: 15px; }
+        .search-input { width: 100%; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 15px; outline: none; transition: 0.2s; background: white; }
+        .search-input:focus { border-color: #ee4d2d; box-shadow: 0 0 6px rgba(238, 77, 45, 0.2); }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .stat-card { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); text-align: center; }
+        .stat-value { font-size: 18px; font-weight: bold; color: #111; margin-top: 4px; }
+        .stat-label { font-size: 11px; color: #666; text-transform: uppercase; font-weight: 600; }
+
+        .tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 15px; }
+        .tab-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 12px; font-weight: bold; color: #555; white-space: nowrap; }
+        .tab-btn.active { background: #ee4d2d; color: white; border-color: #ee4d2d; }
+
+        .order-card { background: white; border-radius: 8px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid #ccc; }
+        .order-card.selesai { border-left-color: #28a745; }
+        .order-card.perlu-dikirim { border-left-color: #ffc107; }
+        .order-card.dikirim { border-left-color: #17a2b8; }
+        .order-card.dibatalkan { border-left-color: #dc3545; }
+
+        .order-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #666; border-bottom: 1px solid #f0f0f0; padding-bottom: 6px; margin-bottom: 8px; flex-wrap: wrap; gap: 5px; }
+        .badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; text-transform: uppercase; }
+        .badge.selesai { background: #e8f5e9; color: #2e7d32; }
+        .badge.perlu-dikirim { background: #fff8e1; color: #f57f17; }
+        .badge.dikirim { background: #e0f7fa; color: #00838f; }
+        .badge.dibatalkan { background: #ffebee; color: #c62828; }
+
+        .product-title { font-weight: bold; font-size: 14px; color: #222; margin-bottom: 3px; }
+        .product-variant { font-size: 12px; color: #666; margin-bottom: 8px; }
+        
+        .order-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f9f9f9; padding-top: 8px; font-size: 12px; flex-wrap: wrap; gap: 8px; }
+        .price { font-size: 15px; font-weight: bold; color: #ee4d2d; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div class="title">📦 Dashboard Pesanan Shopee</div>
+        <label class="upload-btn">
+            📂 Import Excel Shopee
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display: none;" onchange="handleFileUpload(event)">
+        </label>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 Ketik No. Pesanan, Resi, Username, atau Nama Produk..." oninput="filterOrders()">
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Total Pesanan</div><div class="stat-value" id="statTotal">0</div></div>
+        <div class="stat-card"><div class="stat-label">Perlu Dikirim</div><div class="stat-value" id="statPerlu" style="color: #f57f17;">0</div></div>
+        <div class="stat-card"><div class="stat-label">Dikirim</div><div class="stat-value" id="statDikirim" style="color: #00838f;">0</div></div>
+        <div class="stat-card"><div class="stat-label">Selesai</div><div class="stat-value" id="statSelesai" style="color: #2e7d32;">0</div></div>
+        <div class="stat-card"><div class="stat-label">Dibatalkan</div><div class="stat-value" id="statBatal" style="color: #c62828;">0</div></div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="setTab('Semua', this)">Semua</button>
+        <button class="tab-btn" onclick="setTab('Perlu Dikirim', this)">Perlu Dikirim</button>
+        <button class="tab-btn" onclick="setTab('Dikirim', this)">Dikirim</button>
+        <button class="tab-btn" onclick="setTab('Selesai', this)">Selesai</button>
+        <button class="tab-btn" onclick="setTab('Dibatalkan', this)">Dibatalkan</button>
+    </div>
+
+    <div id="orderList"></div>
+</div>
+
+<script>
+    let ordersData = [];
+    let currentTab = 'Semua';
+
+    // Sample data to start with if no file is uploaded yet
+    const sampleData = [
+      {
+        "No. Pesanan": "260806KB2XEJS5",
+        "Status Pesanan": "Selesai",
+        "Username (Pembeli)": "riismmaaa",
+        "Nama Produk": "Milly Ruffle Blouse - Kemeja Putih Wanita Kerah Vintage Korean Style Atasan Flowy Casual",
+        "Nama Variasi": "Putih,All Size Fit to L",
+        "Jumlah": 2,
+        "Total Pembayaran": 81.262,
+        "Metode Pembayaran": "QRIS",
+        "No. Resi": "SPXID067787597878",
+        "Opsi Pengiriman": "Reguler (Cashless)-SPX Standard"
+      },
+      {
+        "No. Pesanan": "26082226FVKTGP",
+        "Status Pesanan": "Batal",
+        "Username (Pembeli)": "utxg72jxwj",
+        "Nama Produk": "Atasan Wanita Rayon Polkadot Blouse Wanita Terbaru Size XL XXL",
+        "Nama Variasi": "Polka Hitam,XL",
+        "Jumlah": 1,
+        "Total Pembayaran": 0.0,
+        "Metode Pembayaran": "Online Payment",
+        "No. Resi": "-",
+        "Opsi Pengiriman": "Reguler (Cashless)"
+      }
+    ];
+
+    function parsePrice(val) {
+        if (!val) return 0;
+        let num = parseFloat(val);
+        if (isNaN(num)) return 0;
+        // Adjust based on typical Shopee export format where decimals might be thousands if < 1000
+        if (num > 0 && num < 1000) return num * 1000; 
+        return num;
+    }
+
+    function formatRupiah(num) {
+        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
+    }
+
+    function getBadgeClass(status) {
+        let s = (status || '').toString().toLowerCase();
+        if (s.includes('selesai')) return 'selesai';
+        if (s.includes('perlu') || s.includes('bayar')) return 'perlu-dikirim';
+        if (s.includes('dikirim') || s.includes('kirim') || s.includes('sedang')) return 'dikirim';
+        if (s.includes('batal')) return 'dibatalkan';
+        return '';
+    }
+
+    function updateStats() {
+        document.getElementById('statTotal').innerText = ordersData.length;
+        document.getElementById('statPerlu').innerText = ordersData.filter(o => getBadgeClass(o['Status Pesanan']) === 'perlu-dikirim').length;
+        document.getElementById('statDikirim').innerText = ordersData.filter(o => getBadgeClass(o['Status Pesanan']) === 'dikirim').length;
+        document.getElementById('statSelesai').innerText = ordersData.filter(o => getBadgeClass(o['Status Pesanan']) === 'selesai').length;
+        document.getElementById('statBatal').innerText = ordersData.filter(o => getBadgeClass(o['Status Pesanan']) === 'dibatalkan').length;
+    }
+
+    function renderOrders(list) {
+        const container = document.getElementById('orderList');
+        if (list.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding: 40px; color: #888;">Pesanan tidak ditemukan.</div>`;
+            return;
+        }
+
+        container.innerHTML = list.map(item => {
+            let statusClass = getBadgeClass(item['Status Pesanan']);
+            // Try Subtotal if Total Pembayaran is empty/0
+            let harga = parsePrice(item['Total Pembayaran']) || parsePrice(item['Subtotal Pesanan']);
+            
+            // Handle missing fields safely
+            let noPesanan = item['No. Pesanan'] || '-';
+            let pembeli = item['Username (Pembeli)'] || '-';
+            let statusPesanan = item['Status Pesanan'] || 'Status Tidak Diketahui';
+            let namaProduk = item['Nama Produk'] || 'Produk tanpa nama';
+            let variasi = item['Nama Variasi'] || '-';
+            let jumlah = item['Jumlah'] || 1;
+            let resi = item['No. Resi'] || 'Belum Ada';
+            let metodePembayaran = item['Metode Pembayaran'] || '-';
+
+            return `
+                <div class="order-card ${statusClass}">
+                    <div class="order-header">
+                        <div>No. Pesanan: <strong>${noPesanan}</strong></div>
+                        <div>Pembeli: <strong>@${pembeli}</strong></div>
+                        <span class="badge ${statusClass}">${statusPesanan}</span>
+                    </div>
+                    <div class="product-title">${namaProduk}</div>
+                    <div class="product-variant">Variasi: ${variasi} | Qty: x${jumlah}</div>
+                    <div class="order-footer">
+                        <div>Resi: <strong>${resi}</strong> (${metodePembayaran})</div>
+                        <div class="price">${formatRupiah(harga)}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function filterOrders() {
+        const query = document.getElementById('searchInput').value.toLowerCase().trim();
+        
+        let filtered = ordersData.filter(item => {
+            let matchTab = true;
+            let statusClass = getBadgeClass(item['Status Pesanan']);
+            
+            if (currentTab === 'Perlu Dikirim') matchTab = statusClass === 'perlu-dikirim';
+            if (currentTab === 'Dikirim') matchTab = statusClass === 'dikirim';
+            if (currentTab === 'Selesai') matchTab = statusClass === 'selesai';
+            if (currentTab === 'Dibatalkan') matchTab = statusClass === 'dibatalkan';
+
+            let matchQuery = !query || 
+                (item['No. Pesanan'] && String(item['No. Pesanan']).toLowerCase().includes(query)) ||
+                (item['Username (Pembeli)'] && String(item['Username (Pembeli)']).toLowerCase().includes(query)) ||
+                (item['No. Resi'] && String(item['No. Resi']).toLowerCase().includes(query)) ||
+                (item['Nama Produk'] && String(item['Nama Produk']).toLowerCase().includes(query));
+
+            return matchTab && matchQuery;
+        });
+
+        renderOrders(filtered);
+    }
+
+    function setTab(tabName, btn) {
+        currentTab = tabName;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filterOrders();
+    }
+
+    function handleFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.SheetNames[0];
+                
+                // Convert sheet to JSON
+                const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+                
+                if(rawData.length > 0) {
+                   ordersData = rawData;
+                   updateStats();
+                   filterOrders();
+                } else {
+                   alert("File Excel kosong atau format tidak sesuai.");
+                }
+            } catch (error) {
+                console.error("Error reading file:", error);
+                alert("Gagal membaca file Excel. Pastikan file yang diunggah adalah hasil export dari Shopee Seller Centre (.xlsx).");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // Initialize with sample data so the dashboard isn't completely empty initially
+    window.onload = function() {
+        ordersData = sampleData;
+        updateStats();
+        filterOrders();
+    };
+</script>
+
+</body>
+</html>
